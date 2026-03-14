@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>London Klassenfahrt</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Georgia, serif; background: #f5f0e8; min-height: 100vh; color: #1a1a1a; }
+    .header {
+      background: linear-gradient(135deg, #c8102e 0%, #8b0a1e 50%, #1a1a2e 100%);
+      padding: 2rem 1.5rem 1.5rem; text-align: center; position: relative; overflow: hidden;
+    }
+    .header-pattern {
+      position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px);
+    }
+    .header-content { position: relative; }
+    .header-flag { font-size: 2.5rem; margin-bottom: 0.3rem; }
+    .header h1 { color: #fff; font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: bold; letter-spacing: 0.05em; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    .header p { color: rgba(255,255,255,0.75); margin-top: 0.4rem; font-size: 0.95rem; font-style: italic; }
+    .tabs { display: flex; background: #fff; border-bottom: 2px solid #c8102e; position: sticky; top: 0; z-index: 10; overflow-x: auto; }
+    .tab-btn { flex: 1; padding: 0.85rem 0.3rem; border: none; background: transparent; color: #555; font-family: Georgia, serif; font-size: clamp(0.65rem, 2vw, 0.85rem); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .tab-btn.active { background: #c8102e; color: #fff; font-weight: bold; }
+    .content { max-width: 700px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .intro-text { color: #666; font-style: italic; margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* --- Schedule --- */
+    .schedule-item { margin-bottom: 0.6rem; }
+    .transport-label { display: flex; align-items: center; gap: 6px; padding: 4px 12px; margin-left: 66px; margin-bottom: 2px; }
+    .schedule-card { display: flex; gap: 1rem; background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .schedule-card.highlight { background: #fff8f8; box-shadow: 0 2px 12px rgba(200,16,46,0.15); outline: 1.5px solid rgba(200,16,46,0.2); }
+    .schedule-time { min-width: 50px; text-align: center; }
+    .schedule-time .icon { font-size: 1.4rem; }
+    .schedule-time .time { font-size: 0.72rem; color: #888; font-weight: bold; margin-top: 2px; }
+    .schedule-info .title { font-weight: bold; font-size: 1rem; }
+    .schedule-info .desc { font-size: 0.88rem; color: #555; margin-top: 0.2rem; line-height: 1.5; }
+
+    /* --- Bus --- */
+    .bus-header { background: #c8102e; color: #fff; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; }
+    .bus-header .bus-title { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.3rem; }
+    .bus-header .bus-sub { font-size: 0.88rem; opacity: 0.9; line-height: 1.6; }
+    .bus-warning { background: #fff8f0; border: 2px solid #e8a020; border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; }
+    .bus-warning .warn-title { font-weight: bold; color: #c47010; margin-bottom: 0.4rem; }
+    .bus-warning .warn-text { font-size: 0.85rem; color: #555; line-height: 1.5; }
+    .stops-title { font-weight: bold; font-size: 1rem; margin-bottom: 1rem; color: #333; }
+    .stop-card { display: flex; gap: 0.8rem; align-items: flex-start; background: #fff; border: 1px solid #e8e0d8; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.6rem; }
+    .stop-card.highlight { background: #fff0f0; border: 2px solid #c8102e; }
+    .stop-icon { font-size: 1.3rem; min-width: 30px; text-align: center; }
+    .stop-name { font-size: 0.95rem; color: #222; }
+    .stop-card.highlight .stop-name { font-weight: bold; color: #c8102e; }
+    .stop-note { font-size: 0.82rem; color: #666; margin-top: 2px; }
+    .strategy-box { background: #1a1a2e; color: #fff; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+    .strategy-box .strat-title { font-weight: bold; margin-bottom: 0.5rem; }
+    .strategy-box .strat-text { font-size: 0.85rem; line-height: 1.7; opacity: 0.9; }
+
+    /* --- Rally --- */
+    .rally-header { background: #1a1a2e; color: #fff; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .rally-header .rally-title { font-weight: bold; font-size: 1rem; }
+    .rally-header .rally-sub { font-size: 0.82rem; color: rgba(255,255,255,0.65); margin-top: 2px; }
+    .rally-score { text-align: right; }
+    .rally-score .points { font-size: 1.4rem; font-weight: bold; color: #f5c518; }
+    .rally-score .progress { font-size: 0.75rem; color: rgba(255,255,255,0.5); }
+    .quest-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.8rem; cursor: pointer; transition: all 0.2s; display: flex; gap: 0.8rem; align-items: flex-start; }
+    .quest-card:hover { transform: translateY(-1px); }
+    .quest-card.done { background: #e8f5e9; border-color: #4caf50; }
+    .quest-emoji { font-size: 1.6rem; min-width: 36px; text-align: center; }
+    .quest-body { flex: 1; }
+    .quest-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .quest-title { font-weight: bold; font-size: 0.95rem; color: #1a1a1a; }
+    .quest-card.done .quest-title { text-decoration: line-through; color: #888; }
+    .quest-badge { background: #c8102e; color: #fff; border-radius: 20px; padding: 1px 8px; font-size: 0.75rem; font-weight: bold; white-space: nowrap; margin-left: 8px; }
+    .quest-card.done .quest-badge { background: #4caf50; }
+    .quest-desc { font-size: 0.85rem; color: #666; margin-top: 0.2rem; line-height: 1.5; }
+    .quest-loc { font-size: 0.75rem; color: #999; margin-top: 0.3rem; }
+
+    /* --- Tipps --- */
+    .tip-section { background: #fff; border-radius: 10px; padding: 1.1rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .tip-title { font-weight: bold; font-size: 1rem; margin-bottom: 0.6rem; color: #c8102e; }
+    .tip-section ul { padding-left: 1.2rem; }
+    .tip-section li { font-size: 0.88rem; color: #444; margin-bottom: 0.4rem; line-height: 1.5; }
+
+    /* --- Upload Tab --- */
+    .upload-header { background: linear-gradient(135deg, #1a1a2e, #2d2d5e); color: #fff; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.5rem; }
+    .upload-header h2 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+    .upload-header p { font-size: 0.85rem; opacity: 0.8; line-height: 1.5; }
+    .upload-form { background: #fff; border-radius: 12px; padding: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 1.5rem; }
+    .upload-form label { display: block; font-size: 0.85rem; font-weight: bold; color: #444; margin-bottom: 0.4rem; margin-top: 0.8rem; }
+    .upload-form label:first-child { margin-top: 0; }
+    .upload-form input[type="text"] {
+      width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+    }
+    .upload-form input[type="text"]:focus { border-color: #c8102e; }
+    .drop-zone {
+      border: 2.5px dashed #c8102e; border-radius: 12px; padding: 2rem 1rem;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: #fff8f8;
+      margin-top: 0.8rem;
+    }
+    .drop-zone:hover, .drop-zone.dragover { background: #ffe8ec; border-color: #8b0a1e; }
+    .drop-zone .drop-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .drop-zone .drop-text { font-size: 0.9rem; color: #666; }
+    .drop-zone .drop-sub { font-size: 0.78rem; color: #999; margin-top: 0.3rem; }
+    .drop-zone input[type="file"] { display: none; }
+    .file-preview { margin-top: 1rem; }
+    .file-preview-item { display: flex; align-items: center; gap: 0.6rem; background: #f0f0f0; border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; font-size: 0.85rem; }
+    .file-preview-item .preview-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; }
+    .file-preview-item .preview-name { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-preview-item .preview-size { color: #888; font-size: 0.75rem; }
+    .file-preview-item .preview-remove { cursor: pointer; color: #c8102e; font-size: 1.1rem; padding: 0 4px; }
+    .btn-upload {
+      width: 100%; margin-top: 1rem; padding: 0.85rem; border: none; border-radius: 10px;
+      background: #c8102e; color: #fff; font-family: Georgia, serif; font-size: 1rem;
+      font-weight: bold; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-upload:hover { background: #8b0a1e; }
+    .btn-upload:disabled { background: #ccc; cursor: not-allowed; }
+    .upload-progress { margin-top: 0.8rem; display: none; }
+    .progress-bar-bg { background: #eee; border-radius: 10px; height: 8px; overflow: hidden; }
+    .progress-bar { background: #c8102e; height: 100%; width: 0%; transition: width 0.3s; border-radius: 10px; }
+    .progress-label { text-align: center; font-size: 0.8rem; color: #666; margin-top: 0.4rem; }
+    .upload-message { margin-top: 0.8rem; padding: 0.7rem 1rem; border-radius: 8px; font-size: 0.88rem; display: none; }
+    .upload-message.success { background: #e8f5e9; color: #2d7a4f; border: 1px solid #4caf50; }
+    .upload-message.error { background: #fff0f0; color: #c8102e; border: 1px solid #c8102e; }
+
+    /* --- Gallery Tab --- */
+    .gallery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; }
+    .gallery-header h2 { font-size: 1.1rem; color: #1a1a2e; }
+    .gallery-count { font-size: 0.82rem; color: #888; }
+    .gallery-filter { margin-bottom: 1.2rem; }
+    .gallery-filter input {
+      width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 0.88rem; outline: none; transition: border-color 0.2s;
+    }
+    .gallery-filter input:focus { border-color: #c8102e; }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.8rem; }
+    .gallery-item { border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .gallery-item:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+    .gallery-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+    .gallery-item-info { padding: 0.5rem; }
+    .gallery-item-info .gi-name { font-size: 0.78rem; color: #333; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gallery-item-info .gi-meta { font-size: 0.7rem; color: #999; margin-top: 1px; }
+    .gallery-empty { text-align: center; padding: 3rem 1rem; color: #999; }
+    .gallery-empty .empty-icon { font-size: 3rem; margin-bottom: 0.8rem; }
+    .gallery-empty p { font-size: 0.9rem; }
+    .gallery-loading { text-align: center; padding: 2rem; color: #888; font-style: italic; }
+
+    /* --- Lightbox --- */
+    .lightbox {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      z-index: 1000; align-items: center; justify-content: center; flex-direction: column;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox-img { max-width: 92vw; max-height: 75vh; object-fit: contain; border-radius: 8px; }
+    .lightbox-caption { color: #fff; margin-top: 0.8rem; text-align: center; font-size: 0.9rem; opacity: 0.9; max-width: 90vw; }
+    .lightbox-meta { color: rgba(255,255,255,0.55); font-size: 0.78rem; margin-top: 0.3rem; }
+    .lightbox-close {
+      position: absolute; top: 1rem; right: 1.2rem; color: #fff; font-size: 2rem;
+      cursor: pointer; opacity: 0.8; line-height: 1; background: none; border: none;
+    }
+    .lightbox-close:hover { opacity: 1; }
+    .lightbox-nav { display: flex; gap: 1.5rem; margin-top: 1rem; }
+    .lightbox-btn {
+      background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 0.5rem 1.2rem;
+      border-radius: 20px; cursor: pointer; font-size: 1.1rem; transition: background 0.2s;
+    }
+    .lightbox-btn:hover { background: rgba(255,255,255,0.3); }
+    .lightbox-delete {
+      background: rgba(200,16,46,0.6); border: none; color: #fff; padding: 0.4rem 1rem;
+      border-radius: 20px; cursor: pointer; font-size: 0.8rem; transition: background 0.2s; margin-top: 0.5rem;
+    }
+    .lightbox-delete:hover { background: rgba(200,16,46,0.9); }
+
+    /* --- Quest camera button --- */
+    .quest-camera-btn {
+      background: #c8102e; color: #fff; border: none; border-radius: 20px;
+      padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+      margin-left: 6px; transition: background 0.2s; flex-shrink: 0;
+    }
+    .quest-camera-btn:hover { background: #8b0a1e; }
+    .quest-card.done .quest-camera-btn { background: #4caf50; }
+
+    /* --- Rally Upload Modal (bottom sheet) --- */
+    .rum-overlay {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center;
+    }
+    .rum-overlay.open { display: flex; }
+    .rum-sheet {
+      background: #fff; border-radius: 18px 18px 0 0; width: 100%; max-width: 600px;
+      max-height: 90vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom);
+    }
+    .rum-handle { width: 40px; height: 4px; background: #ddd; border-radius: 4px; margin: 10px auto 0; }
+    .rum-header {
+      display: flex; align-items: center; gap: 0.6rem; padding: 1rem 1.2rem 0.8rem;
+      border-bottom: 1px solid #f0e8e0;
+    }
+    .rum-header .rum-icon { font-size: 1.5rem; }
+    .rum-header .rum-title { flex: 1; font-weight: bold; font-size: 1rem; color: #1a1a2e; }
+    .rum-close {
+      background: #f0f0f0; border: none; border-radius: 50%; width: 30px; height: 30px;
+      cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;
+    }
+    .rum-body { padding: 1rem 1.2rem 1.5rem; }
+    .rum-body label { display: block; font-size: 0.82rem; font-weight: bold; color: #555; margin: 0.9rem 0 0.3rem; }
+    .rum-body label:first-child { margin-top: 0; }
+    .rum-body select, .rum-body input[type="text"] {
+      width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+      background: #fff;
+    }
+    .rum-body select:focus, .rum-body input[type="text"]:focus { border-color: #c8102e; }
+    .rum-photo-btns { display: flex; gap: 0.6rem; margin-top: 0.3rem; }
+    .rum-photo-btn {
+      flex: 1; padding: 0.75rem 0.5rem; border: 2px dashed #c8102e; border-radius: 10px;
+      background: #fff8f8; color: #c8102e; font-family: Georgia, serif; font-size: 0.85rem;
+      cursor: pointer; transition: background 0.2s; text-align: center;
+    }
+    .rum-photo-btn:hover { background: #ffe8ec; }
+    .rum-preview { margin-top: 0.6rem; }
+    .rum-preview-item {
+      display: flex; align-items: center; gap: 0.5rem; background: #f5f0e8;
+      border-radius: 8px; padding: 0.4rem 0.7rem; margin-bottom: 0.3rem; font-size: 0.82rem;
+    }
+    .rum-preview-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; }
+    .rum-preview-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+    .rum-preview-rm { cursor: pointer; color: #c8102e; padding: 0 4px; }
+    .rum-progress { margin-top: 0.8rem; display: none; }
+    .rum-msg { margin-top: 0.6rem; padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.85rem; display: none; }
+    .rum-msg.success { background: #e8f5e9; color: #2d7a4f; border: 1px solid #4caf50; }
+    .rum-msg.error   { background: #fff0f0; color: #c8102e; border: 1px solid #c8102e; }
+    .rum-submit {
+      width: 100%; margin-top: 1rem; padding: 0.85rem; border: none; border-radius: 10px;
+      background: #c8102e; color: #fff; font-family: Georgia, serif; font-size: 1rem;
+      font-weight: bold; cursor: pointer; transition: background 0.2s;
+    }
+    .rum-submit:hover { background: #8b0a1e; }
+    .rum-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* --- Gallery filter row --- */
+    .gallery-filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .gallery-filters select {
+      flex: 1; min-width: 130px; padding: 0.55rem 0.7rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 0.82rem; outline: none; background: #fff;
+      transition: border-color 0.2s;
+    }
+    .gallery-filters select:focus { border-color: #c8102e; }
+    .gallery-filter-search {
+      width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 0.88rem; outline: none; transition: border-color 0.2s;
+    }
+    .gallery-filter-search:focus { border-color: #c8102e; }
+    /* Group badge on gallery cards */
+    .gi-group {
+      display: inline-block; background: #1a1a2e; color: #fff; border-radius: 10px;
+      padding: 1px 6px; font-size: 0.68rem; margin-right: 4px; vertical-align: middle;
+    }
+    .gi-quest-badge {
+      display: inline-block; background: #c8102e; color: #fff; border-radius: 10px;
+      padding: 1px 6px; font-size: 0.68rem; vertical-align: middle;
+    }
+    /* --- Schedule rally-link chips --- */
+    .rally-links { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.45rem; }
+    .rally-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: #fff0f0; color: #c8102e; border: 1px solid rgba(200,16,46,0.3);
+      border-radius: 20px; padding: 2px 9px; font-size: 0.72rem; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .rally-chip:hover { background: #ffd8df; }
+    /* flash highlight when navigated to */
+    @keyframes quest-flash {
+      0%   { box-shadow: 0 0 0 0 rgba(200,16,46,0.5); }
+      50%  { box-shadow: 0 0 0 8px rgba(200,16,46,0.15); }
+      100% { box-shadow: 0 0 0 0 rgba(200,16,46,0); }
+    }
+    .quest-card.flash { animation: quest-flash 0.8s ease-out; }
+
+    /* --- Map tab --- */
+    #map-container { position: relative; }
+    #map { height: calc(100vh - 170px); min-height: 400px; border-radius: 12px; overflow: hidden;
+           box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
+    .map-gps-btn {
+      position: absolute; bottom: 1rem; right: 1rem; z-index: 1000;
+      background: #fff; border: 2px solid #c8102e; color: #c8102e; border-radius: 50%;
+      width: 44px; height: 44px; font-size: 1.2rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+    }
+    .map-gps-btn:hover { background: #fff0f0; }
+    .map-gps-btn.active { background: #c8102e; color: #fff; }
+    /* Custom map marker */
+    .map-marker {
+      width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid rgba(0,0,0,0.25); box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .map-marker-inner { transform: rotate(45deg); font-size: 0.7rem; font-weight: bold;
+                        color: #fff; line-height: 1; text-align: center; }
+    /* GPS dot */
+    .gps-dot { width: 16px; height: 16px; background: #2979ff; border-radius: 50%;
+               border: 3px solid #fff; box-shadow: 0 0 0 3px rgba(41,121,255,0.3); }
+    /* Popup style override */
+    .leaflet-popup-content-wrapper { border-radius: 10px; font-family: Georgia, serif; }
+    .mp-time { font-size: 0.72rem; color: #999; margin-bottom: 2px; }
+    .mp-title { font-weight: bold; font-size: 0.92rem; color: #1a1a2e; }
+    .mp-desc { font-size: 0.8rem; color: #555; margin-top: 4px; line-height: 1.4; }
+    .mp-rally { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+    .mp-chip { background: #fff0f0; color: #c8102e; border: 1px solid rgba(200,16,46,0.3);
+               border-radius: 12px; padding: 1px 7px; font-size: 0.7rem; cursor: pointer;
+               white-space: nowrap; }
+
+    /* --- Settings tab --- */
+    .settings-header { margin-bottom: 1.2rem; }
+    .settings-header h2 { font-size: 1.15rem; color: #1a1a2e; }
+    .settings-header p  { font-size: 0.83rem; color: #888; margin-top: 0.2rem; }
+    .settings-card {
+      background: #fff; border-radius: 12px; padding: 1.2rem 1.3rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 1rem;
+    }
+    .settings-card-title { font-weight: bold; font-size: 1rem; color: #1a1a2e; margin-bottom: 0.3rem; }
+    .settings-card-desc  { font-size: 0.83rem; color: #666; margin-bottom: 0.9rem; line-height: 1.5; }
+    .settings-row { display: flex; align-items: center; gap: 0.7rem; }
+    .settings-row input[type="number"] {
+      width: 80px; padding: 0.55rem 0.7rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-family: Georgia, serif; font-size: 1.1rem; text-align: center; outline: none;
+      transition: border-color 0.2s;
+    }
+    .settings-row input[type="number"]:focus { border-color: #c8102e; }
+    .btn-save-settings {
+      padding: 0.55rem 1.2rem; border: none; border-radius: 8px;
+      background: #c8102e; color: #fff; font-family: Georgia, serif; font-size: 0.9rem;
+      font-weight: bold; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-save-settings:hover { background: #8b0a1e; }
+    .settings-msg { font-size: 0.82rem; margin-top: 0.6rem; }
+    .settings-msg.ok  { color: #2d7a4f; }
+    .settings-msg.err { color: #c8102e; }
+    .settings-note { background: #f5f0e8; border-radius: 8px; padding: 0.8rem 1rem;
+                     font-size: 0.82rem; color: #666; line-height: 1.6; margin-top: 0.5rem; }
+
+    #login-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(135deg, #c8102e 0%, #8b0a1e 40%, #1a1a2e 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #login-overlay .lo-pattern {
+      position: absolute; inset: 0;
+      background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px);
+      pointer-events: none;
+    }
+    .login-box {
+      position: relative; background: rgba(255,255,255,0.97); border-radius: 18px;
+      padding: 2.2rem 1.8rem; width: min(360px, 90vw); text-align: center;
+      box-shadow: 0 12px 50px rgba(0,0,0,0.45);
+    }
+    .login-flag { font-size: 2.8rem; margin-bottom: 0.4rem; }
+    .login-box h2 { font-size: 1.3rem; color: #1a1a2e; margin-bottom: 0.3rem; }
+    .login-box p { font-size: 0.85rem; color: #777; margin-bottom: 1.4rem; }
+    .login-input-wrap { position: relative; margin-bottom: 0.8rem; }
+    .login-input-wrap input {
+      width: 100%; padding: 0.75rem 2.8rem 0.75rem 1rem; border: 2px solid #ddd; border-radius: 10px;
+      font-family: Georgia, serif; font-size: 1rem; outline: none; transition: border-color 0.2s;
+    }
+    .login-input-wrap input:focus { border-color: #c8102e; }
+    .login-toggle-pw {
+      position: absolute; right: 0.7rem; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 1.1rem; opacity: 0.5;
+    }
+    .login-toggle-pw:hover { opacity: 0.9; }
+    .btn-login {
+      width: 100%; padding: 0.8rem; border: none; border-radius: 10px;
+      background: #c8102e; color: #fff; font-family: Georgia, serif; font-size: 1rem;
+      font-weight: bold; cursor: pointer; transition: background 0.2s; margin-bottom: 0.6rem;
+    }
+    .btn-login:hover { background: #8b0a1e; }
+    .login-error {
+      display: none; background: #fff0f0; border: 1px solid #c8102e; color: #c8102e;
+      border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.85rem; margin-top: 0.4rem;
+    }
+    /* Role badge in header */
+    .role-badge {
+      position: absolute; top: 0.7rem; right: 0.8rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .role-tag {
+      background: rgba(255,255,255,0.2); color: #fff; border-radius: 20px;
+      padding: 0.2rem 0.7rem; font-size: 0.72rem; border: 1px solid rgba(255,255,255,0.35);
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 20px; padding: 0.2rem 0.7rem; font-size: 0.72rem; cursor: pointer;
+      font-family: Georgia, serif; transition: background 0.2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.3); }
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="header-pattern"></div>
+  <div class="header-content">
+    <div class="header-flag">🇬🇧</div>
+    <h1>London Klassenfahrt</h1>
+    <p>Mittwoch · 39 Schüler:innen · 4 Lehrkräfte · ☀️ 14°C</p>
+  </div>
+  <div class="role-badge" id="role-badge" style="display:none">
+    <span class="role-tag" id="role-tag"></span>
+    <button class="btn-logout" onclick="logout()">Abmelden</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('plan', this)">📅 Tagesplan</button>
+  <button class="tab-btn" onclick="showTab('bus', this)">🚌 Bus 26</button>
+  <button class="tab-btn" onclick="showTab('rally', this)">🎯 Rallye</button>
+  <button class="tab-btn" onclick="showTab('tipps', this)">💡 Tipps</button>
+  <button class="tab-btn" onclick="showTab('upload', this)">📷 Fotos</button>
+  <button class="tab-btn" onclick="showTab('galerie', this)">🖼️ Galerie</button>
+  <button class="tab-btn" onclick="showTab('karte', this)">🗺️ Karte</button>
+  <button class="tab-btn" id="tab-btn-einstellungen" style="display:none" onclick="showTab('einstellungen', this)">⚙️ Einstellungen</button>
+</div>
+
+<div class="content">
+  <!-- TAGESPLAN -->
+  <div id="tab-plan" class="tab-panel active">
+    <p class="intro-text">Grober Ablauf — flexibel anpassbar je nach Laune und Tempo der Gruppe 🙂</p>
+    <div id="schedule-list"></div>
+  </div>
+
+  <!-- BUS -->
+  <div id="tab-bus" class="tab-panel">
+    <div class="bus-header">
+      <div class="bus-title">🚌 Bus 26 — euer Sightseeing-Express</div>
+      <div class="bus-sub">Fährt ca. alle 10 Minuten · Tageskarte gilt · Oben auf dem Doppeldecker sitzen!</div>
+    </div>
+    <div class="bus-warning">
+      <div class="warn-title">⚠️ Wichtig: Nicht Bus 11 nehmen!</div>
+      <div class="warn-text">Bus 11 fährt seit 2022 nur noch Fulham → Waterloo und deckt die Innenstadt nicht mehr ab. Den zentralen Korridor übernimmt jetzt Linie 26.</div>
+    </div>
+    <div class="stops-title">📍 Streckenverlauf (für euch relevant):</div>
+    <div id="stops-list"></div>
+    <div class="strategy-box">
+      <div class="strat-title">🎒 Strategie für 4 Gruppen:</div>
+      <div class="strat-text">Vier Gruppen à ~10 Personen steigen nacheinander (je 1–2 Minuten Abstand) ein — so verteilt ihr euch auf verschiedene Busse ohne Chaos. Alle steigen bei <strong>Aldwych</strong> aus und sammeln sich dort. Eine Lehrkraft pro Gruppe.</div>
+    </div>
+  </div>
+
+  <!-- RALLYE -->
+  <div id="tab-rally" class="tab-panel">
+    <div class="rally-header">
+      <div>
+        <div class="rally-title">🎯 Stadtrallye London</div>
+        <div class="rally-sub">Gruppen: ~6 Personen · Fotos als Beweis</div>
+      </div>
+      <div class="rally-score">
+        <div class="points" id="total-points">0 Pkt</div>
+        <div class="progress" id="quest-progress">0/12 erledigt</div>
+      </div>
+    </div>
+    <div id="quest-list"></div>
+  </div>
+
+  <!-- TIPPS -->
+  <div id="tab-tipps" class="tab-panel">
+    <div id="tipps-list"></div>
+  </div>
+
+  <!-- FOTO-UPLOAD -->
+  <div id="tab-upload" class="tab-panel">
+    <div class="upload-header">
+      <h2>📷 Fotos hochladen</h2>
+      <p>Lade deine Fotos vom Tag hoch — sie erscheinen dann in der gemeinsamen Galerie für alle!</p>
+    </div>
+    <div class="upload-form">
+      <label for="upload-group">Deine Gruppe</label>
+      <select id="upload-group">
+        <option value="">Gruppe wählen...</option>
+        <option>Gruppe 1</option>
+        <option>Gruppe 2</option>
+        <option>Gruppe 3</option>
+        <option>Gruppe 4</option>
+      </select>
+
+      <label for="upload-desc">Beschreibung (optional)</label>
+      <input type="text" id="upload-desc" placeholder="z.B. Löwen-Pose am Trafalgar Square" maxlength="150" />
+
+      <label>Fotos auswählen</label>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+        <div class="drop-icon">📸</div>
+        <div class="drop-text">Hier klicken oder Fotos reinziehen</div>
+        <div class="drop-sub">JPG, PNG, WebP · Max. 10 MB pro Foto · Mehrere möglich</div>
+      </div>
+      <div class="file-preview" id="file-preview"></div>
+
+      <div class="upload-progress" id="upload-progress">
+        <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+        <div class="progress-label" id="progress-label">Lade hoch...</div>
+      </div>
+      <div class="upload-message" id="upload-message"></div>
+
+      <button class="btn-upload" id="btn-upload" onclick="uploadPhotos()">📤 Fotos hochladen</button>
+    </div>
+  </div>
+
+  <!-- GALERIE -->
+  <div id="tab-galerie" class="tab-panel">
+    <div class="gallery-header">
+      <h2>🖼️ Unsere Fotos</h2>
+      <span class="gallery-count" id="gallery-count">Lade...</span>
+    </div>
+    <div class="gallery-filters">
+      <select id="filter-group" onchange="filterGallery()">
+        <option value="">Alle Gruppen</option>
+        <option>Gruppe 1</option>
+        <option>Gruppe 2</option>
+        <option>Gruppe 3</option>
+        <option>Gruppe 4</option>
+      </select>
+      <select id="filter-quest" onchange="filterGallery()">
+        <option value="">Alle Fotos</option>
+        <option value="general">Nur allgemeine Fotos</option>
+        <option value="rally">Nur Rallye-Fotos</option>
+        <optgroup label="Rallye-Aufgabe">
+          <option value="0">🐿️ Eichhörnchen-Selfie</option>
+          <option value="1">🦁 Löwen-Pose</option>
+          <option value="2">🪖 Royal Guard</option>
+          <option value="3">🗺️ Rote Telefonzelle</option>
+          <option value="4">🕐 Big Ben Mime</option>
+          <option value="5">🪆 Statuen-Spiegel</option>
+          <option value="6">🌊 Themse-Panorama</option>
+          <option value="7">🎭 Street Performer</option>
+          <option value="8">🔴 Roter Bus</option>
+          <option value="9">📸 Spiegelungs-Foto</option>
+          <option value="10">🦢 Park-Idylle</option>
+          <option value="11">🏛️ Museum-Entdecker</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="gallery-filter">
+      <input class="gallery-filter-search" type="text" id="gallery-search" placeholder="🔍 Nach Gruppe oder Beschreibung suchen..." oninput="filterGallery()" />
+    </div>
+    <div id="gallery-grid" class="gallery-grid">
+      <div class="gallery-loading">Fotos werden geladen...</div>
+    </div>
+  </div>
+  <!-- EINSTELLUNGEN (nur Admin) -->
+  <div id="tab-einstellungen" class="tab-panel">
+    <div class="settings-header">
+      <h2>⚙️ Einstellungen</h2>
+      <p>Nur für Lehrkräfte · Änderungen gelten sofort für alle Geräte</p>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-title">👥 Anzahl der Gruppen</div>
+      <div class="settings-card-desc">
+        Legt fest, wie viele Gruppen in den Auswahlmenüs angezeigt werden
+        (Foto-Upload, Rallye-Upload, Galerie-Filter).
+      </div>
+      <div class="settings-row">
+        <input type="number" id="settings-group-count" min="1" max="20" value="4" />
+        <button class="btn-save-settings" onclick="saveSettings()">Speichern</button>
+      </div>
+      <div class="settings-msg" id="settings-msg"></div>
+      <div class="settings-note">
+        💡 Tipp: Einstellung erst kurz vor der Abfahrt festlegen, wenn klar ist wie viele
+        Gruppen es gibt. Die Änderung ist sofort auf allen Handys sichtbar.
+      </div>
+    </div>
+  </div>
+
+  <!-- KARTE -->
+  <div id="tab-karte" class="tab-panel">
+    <div id="map-container">
+      <div id="map"></div>
+      <button class="map-gps-btn" id="gps-btn" title="Meinen Standort anzeigen" onclick="toggleGps()">📍</button>
+    </div>
+  </div>
+</div>
+
+<!-- RALLY UPLOAD MODAL -->
+<div class="rum-overlay" id="rum-overlay" onclick="closeRallyModal(event)">
+  <div class="rum-sheet" id="rum-sheet">
+    <div class="rum-handle"></div>
+    <div class="rum-header">
+      <span class="rum-icon" id="rum-icon">📷</span>
+      <span class="rum-title" id="rum-title">Foto hochladen</span>
+      <button class="rum-close" onclick="closeRallyModal(null, true)">✕</button>
+    </div>
+    <div class="rum-body">
+      <label>Deine Gruppe</label>
+      <select id="rum-group">
+        <option value="">Gruppe wählen...</option>
+        <option>Gruppe 1</option>
+        <option>Gruppe 2</option>
+        <option>Gruppe 3</option>
+        <option>Gruppe 4</option>
+      </select>
+
+      <label>Beschreibung (optional)</label>
+      <input type="text" id="rum-desc" placeholder="Was ist auf dem Foto?" maxlength="150" />
+
+      <label>Foto auswählen oder aufnehmen</label>
+      <div class="rum-photo-btns">
+        <button class="rum-photo-btn" onclick="document.getElementById('rum-file-gallery').click()">
+          🖼️ Aus Galerie
+        </button>
+        <button class="rum-photo-btn" onclick="document.getElementById('rum-file-camera').click()">
+          📷 Kamera
+        </button>
+      </div>
+      <input type="file" id="rum-file-gallery" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden />
+      <input type="file" id="rum-file-camera" accept="image/*" capture="environment" hidden />
+
+      <div class="rum-preview" id="rum-preview"></div>
+
+      <div class="rum-progress" id="rum-progress">
+        <div class="progress-bar-bg"><div class="progress-bar" id="rum-bar"></div></div>
+        <div class="progress-label" id="rum-progress-label">Lade hoch...</div>
+      </div>
+      <div class="rum-msg" id="rum-msg"></div>
+
+      <button class="rum-submit" id="rum-submit" onclick="uploadRallyPhotos()">📤 Hochladen</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="lo-pattern"></div>
+  <div class="login-box">
+    <div class="login-flag">🇬🇧</div>
+    <h2>London Klassenfahrt</h2>
+    <p>Bitte Passwort eingeben um fortzufahren</p>
+    <div class="login-input-wrap">
+      <input type="password" id="login-pw" placeholder="Passwort"
+             onkeydown="if(event.key==='Enter') doLogin()" autocomplete="current-password" />
+      <button class="login-toggle-pw" type="button" onclick="togglePwVisibility()" id="pw-eye">👁</button>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Anmelden</button>
+    <div class="login-error" id="login-error">Falsches Passwort — bitte nochmal versuchen.</div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightboxOnBg(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="" />
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+  <div class="lightbox-meta" id="lightbox-meta"></div>
+  <div class="lightbox-nav">
+    <button class="lightbox-btn" onclick="lightboxNav(-1)">◀ Zurück</button>
+    <button class="lightbox-btn" onclick="lightboxNav(1)">Weiter ▶</button>
+  </div>
+  <button class="lightbox-delete" id="lightbox-delete" onclick="deletePhoto()">🗑 Löschen</button>
+</div>
+
+<script>
+// ===================== DATA =====================
+const quests = [
+  { emoji: "🐿️", title: "Eichhörnchen-Selfie", desc: "Macht ein Gruppenselfie mit einem Eichhörnchen im St. James's Park", points: 3, location: "St. James's Park" },
+  { emoji: "🦁", title: "Löwen-Pose", desc: "Findet einen der vier Bronzelöwen am Trafalgar Square und posiert alle in exakt derselben Pose", points: 4, location: "Trafalgar Square" },
+  { emoji: "🪖", title: "Royal Guard", desc: "Fotografiert euch so nah wie erlaubt neben einem Palastwächter — ohne zu lachen!", points: 3, location: "Buckingham Palace" },
+  { emoji: "🗺️", title: "Rote Telefonzelle", desc: "Findet eine klassische rote Telefonzelle und alle strecken einen Arm raus, als würdet ihr telefonieren", points: 2, location: "Überall in der City" },
+  { emoji: "🕐", title: "Big Ben Mime", desc: "Stellt Big Ben mit euren Körpern nach — einer ist der Turm, andere die Zeiger", points: 5, location: "Westminster" },
+  { emoji: "🪆", title: "Statuen-Spiegel", desc: "Findet eine Statue und alle imitieren ihre Pose so genau wie möglich. Wer ist am überzeugendsten?", points: 4, location: "Trafalgar Square / überall" },
+  { emoji: "🌊", title: "Themse-Panorama", desc: "Macht ein Foto auf der Westminster Bridge, auf dem alle in einer Reihe stehen und in verschiedene Richtungen schauen", points: 2, location: "Westminster Bridge" },
+  { emoji: "🎭", title: "Street Performer Fan Club", desc: "Findet einen Straßenkünstler in Covent Garden und macht ein spontanes Applaus-Foto", points: 3, location: "Covent Garden" },
+  { emoji: "🔴", title: "Roter Bus", desc: "Alle springen vor einem roten Doppeldeckerbus in die Luft — perfektes Timing gewinnt!", points: 4, location: "Irgendwo in London" },
+  { emoji: "📸", title: "Spiegelungs-Foto", desc: "Findet eine Pfütze oder Glasscheibe, in der sich ein Wahrzeichen spiegelt, und fotografiert die Spiegelung", points: 5, location: "Southbank / Westminster" },
+  { emoji: "🦢", title: "Park-Idylle", desc: "Findet eine Ente, einen Schwan oder Pelikan im Park und macht ein möglichst dramatisches Nature-Doku-Bild", points: 3, location: "St. James's Park" },
+  { emoji: "🏛️", title: "Museum-Entdecker", desc: "Findet im British Museum das älteste Objekt, das ihr finden könnt — fotografiert das Schild mit dem Datum!", points: 4, location: "British Museum" },
+];
+const schedule = [
+  { time: "09:30", icon: "⚓", title: "Ankunft Westminster Pier", desc: "Treffpunkt & Kopfzählen. Gruppen einteilen, Rallye-Aufgaben verteilen.", color: "#1a6b8a", transport: null, rallyLinks: [3, 8] },
+  { time: "10:00", icon: "👑", title: "Buckingham Palace", desc: "Wachablösung (wenn Timing passt: 11:30 Uhr). Rallye: Royal Guard Foto!", color: "#8b5e3c", transport: { type: "walk", label: "10 Min zu Fuß vom Pier" }, rallyLinks: [2] },
+  { time: "10:45", icon: "🌳", title: "St. James's Park", desc: "Pause & Snacks. Eichhörnchen-Rallye, Pelikan-Sichtung — bei 14° Sonne ein Traum.", color: "#2d7a4f", transport: { type: "walk", label: "5 Min zu Fuß vom Palace" }, rallyLinks: [0, 10] },
+  { time: "11:30", icon: "🚌", title: "Bus 26 ab Westminster", desc: "Einstieg an Parliament Square / Westminster. Vier Gruppen steigen nacheinander ein, alle oben auf dem Doppeldecker. Fahrt über Whitehall → Trafalgar Square → Strand → Aldwych.", color: "#c8102e", transport: { type: "bus", label: "Bus 26 Richtung Liverpool Street" }, highlight: true, rallyLinks: [] },
+  { time: "12:00", icon: "🎭", title: "Covent Garden", desc: "Ausstieg Aldwych, 5 Min zu Fuß. Freizeit! Straßenkünstler auf der Piazza, Markthalle, Cafés.", color: "#c45c1a", transport: { type: "walk", label: "5 Min von Aldwych" }, rallyLinks: [7] },
+  { time: "13:00", icon: "🏛️", title: "British Museum", desc: "Kostenloser Eintritt (Mi 10–17h). Highlights: Rosetta Stone, Ägyptische Mumien, Elgin Marbles. Ca. 1–1,5h.", color: "#7a3d8b", transport: { type: "walk", label: "10 Min zu Fuß von Covent Garden" }, rallyLinks: [11] },
+  { time: "14:30", icon: "🦁", title: "Trafalgar Square", desc: "Nelson's Column, vier Bronzelöwen. Rallye: Löwen-Pose & Statuen-Spiegel. Direkt daneben: National Gallery (kostenlos).", color: "#1a4d8b", transport: { type: "walk", label: "10 Min zu Fuß vom Museum" }, rallyLinks: [1, 5] },
+  { time: "15:15", icon: "🕐", title: "Big Ben & Westminster Bridge", desc: "Foto-Stopp, Big Ben Mime Challenge. Panorama-Rallye auf der Brücke.", color: "#8b3a3a", transport: { type: "walk", label: "10 Min zu Fuß" }, rallyLinks: [4, 6] },
+  { time: "16:00", icon: "🎡", title: "Southbank-Spaziergang", desc: "Entlang der Themse Richtung London Eye. Entspannt, schöne Aussichten, letzter Rallye-Push.", color: "#3a7a6b", transport: { type: "walk", label: "Über Westminster Bridge" }, rallyLinks: [9] },
+  { time: "17:00", icon: "🚌", title: "Rückfahrt & Auswertung", desc: "Gruppen sammeln sich. Rallye-Punkte auszählen — wer hat gewonnen? 🏆", color: "#555", transport: null, rallyLinks: [] },
+];
+const stops = [
+  { stop: "Westminster / Parliament Square", note: "✅ Euer Einstieg — direkt am Westminster Pier & Big Ben.", highlight: true, icon: "🕐" },
+  { stop: "Whitehall / Horse Guards Parade", note: "Kurzer Blick auf die Kavallerie-Wache", icon: "🐎" },
+  { stop: "Trafalgar Square", note: "Hier können einzelne Gruppen aussteigen für Löwen-Pose Rallye", icon: "🦁" },
+  { stop: "Charing Cross / Strand", note: "Lebhafter Abschnitt, viele Shops & Cafés sichtbar", icon: "🛍️" },
+  { stop: "Aldwych", note: "✅ Euer Ausstieg — 5 Min zu Fuß nach Covent Garden", highlight: true, icon: "🎭" },
+  { stop: "Fleet Street", note: "Historische Zeitungsmeile — optional weiterfahren", icon: "📰" },
+  { stop: "St. Paul's Cathedral", note: "Ikonische Kuppel sichtbar — kostenlos von außen", icon: "⛪" },
+];
+const tipps = [
+  { title: "🆓 Kostenlose Highlights", items: ["British Museum (kostenlos, Mi 10–17h)", "National Gallery am Trafalgar Square (kostenlos)", "St. James's Park, alle Royal Parks — kostenlos", "Tate Modern (kostenlos) — Southbank", "Straßenkünstler in Covent Garden — kostenlose Unterhaltung"] },
+  { title: "🚌 ÖPNV-Tipps", items: ["Bus 26: Westminster → Trafalgar Square → Strand → Aldwych → St. Paul's", "Tageskarte gilt für alle Busse und U-Bahn in Zone 1–2", "Einstieg bei Parliament Square, nicht Victoria (weniger voll!)", "Vier Gruppen nacheinander einsteigen lassen — je ~2 Min Abstand", "Oben auf dem Doppeldecker sitzen = kostenlose Stadtrundfahrt"] },
+  { title: "🍔 Günstig essen", items: ["Greggs: Günstigste Bäckerei Englands — Sausage Roll ist Pflicht!", "Pret a Manger: Sandwiches & Salate, überall in der City", "Tesco/Sainsbury's Express: Fertige Baguettes & Snacks kaufen", "Picknick im St. James's Park bei schönem Wetter"] },
+  { title: "📋 Organisation", items: ["Treffpunkt bei Aldwych nach Busfahrt vereinbaren", "Notfallnummer aller Lehrkräfte auf Zettel — an alle Schüler:innen!", "Bei Verlorengeher: Treffpunkt Westminster Pier", "Gruppen für Rallye: ~6 Personen, jede mit einem Handy", "Rallye-Auswertung am Ende: Punkte zusammenzählen, Siegergruppe feiern"] },
+];
+
+// ===================== TABS =====================
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'galerie') loadGallery();
+  if (id === 'karte') initMap();
+}
+
+function goToQuest(index) {
+  // Rallye-Tab aktivieren
+  const rallyBtn = document.querySelector('.tab-btn[onclick*="rally"]');
+  showTab('rally', rallyBtn);
+  // Nach kurzem Delay scrollen + kurz aufleuchten lassen
+  setTimeout(() => {
+    const card = document.getElementById('quest-card-' + index);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('flash');
+    card.addEventListener('animationend', () => card.classList.remove('flash'), { once: true });
+  }, 80);
+}
+
+// ===================== SCHEDULE =====================
+const checkedQuests = {};
+function renderSchedule() {
+  document.getElementById('schedule-list').innerHTML = schedule.map(item => {
+    const chips = (item.rallyLinks || []).map(qi =>
+      `<span class="rally-chip" onclick="goToQuest(${qi})">${quests[qi].emoji} ${quests[qi].title}</span>`
+    ).join('');
+    return `
+    <div class="schedule-item">
+      ${item.transport ? `<div class="transport-label"><span style="font-size:0.85rem">${item.transport.type === 'bus' ? '🚌' : '🚶'}</span><span style="font-size:0.75rem;color:${item.transport.type === 'bus' ? '#c8102e' : '#666'};font-style:italic">${item.transport.label}</span></div>` : ''}
+      <div class="schedule-card ${item.highlight ? 'highlight' : ''}" style="border-left:4px solid ${item.color}">
+        <div class="schedule-time"><div class="icon">${item.icon}</div><div class="time">${item.time}</div></div>
+        <div class="schedule-info">
+          <div class="title" style="color:${item.color}">${item.title}</div>
+          <div class="desc">${item.desc}</div>
+          ${chips ? `<div class="rally-links">🎯 ${chips}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderStops() {
+  document.getElementById('stops-list').innerHTML = stops.map(s => `
+    <div class="stop-card ${s.highlight ? 'highlight' : ''}">
+      <div class="stop-icon">${s.icon}</div>
+      <div><div class="stop-name">${s.stop}</div><div class="stop-note">${s.note}</div></div>
+    </div>`).join('');
+}
+function renderQuests() {
+  const done = Object.values(checkedQuests).filter(Boolean).length;
+  const pts = quests.reduce((s, q, i) => s + (checkedQuests[i] ? q.points : 0), 0);
+  document.getElementById('total-points').textContent = pts + ' Pkt';
+  document.getElementById('quest-progress').textContent = done + '/' + quests.length + ' erledigt';
+  document.getElementById('quest-list').innerHTML = quests.map((q, i) => `
+    <div id="quest-card-${i}" class="quest-card ${checkedQuests[i] ? 'done' : ''}" onclick="toggleQuest(${i})">
+      <div class="quest-emoji">${q.emoji}</div>
+      <div class="quest-body">
+        <div class="quest-top">
+          <div class="quest-title">${q.title}</div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <div class="quest-badge">⭐ ${q.points}</div>
+            <button class="quest-camera-btn" onclick="event.stopPropagation();openRallyModal(${i})">📷</button>
+          </div>
+        </div>
+        <div class="quest-desc">${q.desc}</div>
+        <div class="quest-loc">📍 ${q.location}</div>
+      </div>
+    </div>`).join('');
+}
+function toggleQuest(i) {
+  checkedQuests[i] = !checkedQuests[i];
+  renderQuests();
+}
+function renderTipps() {
+  document.getElementById('tipps-list').innerHTML = tipps.map(s => `
+    <div class="tip-section">
+      <div class="tip-title">${s.title}</div>
+      <ul>${s.items.map(item => `<li>${item}</li>`).join('')}</ul>
+    </div>`).join('');
+}
+
+// ===================== FILE UPLOAD =====================
+let selectedFiles = [];
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+fileInput.addEventListener('change', () => {
+  addFiles(Array.from(fileInput.files));
+  fileInput.value = '';
+});
+
+function addFiles(newFiles) {
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const maxSize = 10 * 1024 * 1024;
+  newFiles.forEach(f => {
+    if (!allowed.includes(f.type)) { showMessage('Nicht erlaubter Dateityp: ' + f.name, 'error'); return; }
+    if (f.size > maxSize) { showMessage(f.name + ' ist zu groß (max. 10 MB)', 'error'); return; }
+    if (!selectedFiles.find(x => x.name === f.name && x.size === f.size)) selectedFiles.push(f);
+  });
+  renderFilePreview();
+}
+
+function removeFile(index) {
+  selectedFiles.splice(index, 1);
+  renderFilePreview();
+}
+
+function renderFilePreview() {
+  const el = document.getElementById('file-preview');
+  if (selectedFiles.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = selectedFiles.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    const kb = f.size > 1024*1024 ? (f.size/1024/1024).toFixed(1)+' MB' : Math.round(f.size/1024)+' KB';
+    return `<div class="file-preview-item">
+      <img class="preview-thumb" src="${url}" alt="" />
+      <span class="preview-name">${f.name}</span>
+      <span class="preview-size">${kb}</span>
+      <span class="preview-remove" onclick="removeFile(${i})">✕</span>
+    </div>`;
+  }).join('');
+}
+
+function showMessage(text, type) {
+  const el = document.getElementById('upload-message');
+  el.textContent = text;
+  el.className = 'upload-message ' + type;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+async function uploadPhotos() {
+  const name = document.getElementById('upload-group').value;
+  const desc = document.getElementById('upload-desc').value.trim();
+  if (!name) { showMessage('Bitte wähle deine Gruppe aus.', 'error'); return; }
+  if (selectedFiles.length === 0) { showMessage('Bitte wähle mindestens ein Foto aus.', 'error'); return; }
+
+  const btn = document.getElementById('btn-upload');
+  const progressEl = document.getElementById('upload-progress');
+  const bar = document.getElementById('progress-bar');
+  const label = document.getElementById('progress-label');
+
+  btn.disabled = true;
+  progressEl.style.display = 'block';
+  document.getElementById('upload-message').style.display = 'none';
+
+  let uploaded = 0;
+  const errors = [];
+
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const file = selectedFiles[i];
+    label.textContent = `Lade hoch: ${file.name} (${i+1}/${selectedFiles.length})`;
+    bar.style.width = Math.round((i / selectedFiles.length) * 100) + '%';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('uploader', name);
+    formData.append('description', desc);
+    formData.append('quest_id', '');
+
+    try {
+      const res = await fetch('upload.php', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) { uploaded++; } else { errors.push(file.name + ': ' + (data.error || 'Fehler')); }
+    } catch {
+      errors.push(file.name + ': Verbindungsfehler');
+    }
+  }
+
+  bar.style.width = '100%';
+  label.textContent = 'Fertig!';
+  setTimeout(() => { progressEl.style.display = 'none'; bar.style.width = '0%'; }, 1500);
+
+  if (errors.length > 0) {
+    showMessage(uploaded + ' Foto(s) hochgeladen. Fehler: ' + errors.join('; '), 'error');
+  } else {
+    showMessage(`✅ ${uploaded} Foto(s) erfolgreich hochgeladen! Schau in der Galerie nach.`, 'success');
+    selectedFiles = [];
+    renderFilePreview();
+    document.getElementById('upload-desc').value = '';
+  }
+  btn.disabled = false;
+}
+
+// ===================== GALLERY =====================
+let allPhotos = [];
+let currentLightboxIndex = 0;
+
+async function loadGallery() {
+  const grid = document.getElementById('gallery-grid');
+  grid.innerHTML = '<div class="gallery-loading">Fotos werden geladen...</div>';
+  try {
+    const res = await fetch('get_photos.php');
+    const data = await res.json();
+    allPhotos = data.photos || [];
+    renderGallery(allPhotos);
+  } catch {
+    grid.innerHTML = '<div class="gallery-empty"><div class="empty-icon">⚠️</div><p>Fotos konnten nicht geladen werden.</p></div>';
+  }
+}
+
+function renderGallery(photos) {
+  const grid = document.getElementById('gallery-grid');
+  const count = document.getElementById('gallery-count');
+  count.textContent = photos.length + ' Foto(s)';
+  if (photos.length === 0) {
+    grid.innerHTML = '<div class="gallery-empty"><div class="empty-icon">📷</div><p>Noch keine Fotos vorhanden.<br>Sei der Erste und lade welche hoch!</p></div>';
+    return;
+  }
+  // Index in allPhotos ermitteln (wichtig bei gefilterter Ansicht)
+  grid.innerHTML = photos.map((p) => {
+    const allIdx = allPhotos.findIndex(x => x.id === p.id);
+    return `
+    <div class="gallery-item" onclick="openLightbox(${allIdx})">
+      <img src="uploads/${escHtml(p.filename)}"
+           alt="${escHtml(p.description || p.uploader)}"
+           loading="lazy"
+           onerror="this.style.display='none';this.parentElement.querySelector('.gi-broken').style.display='flex'" />
+      <div class="gi-broken" style="display:none;aspect-ratio:1;align-items:center;justify-content:center;font-size:2rem;background:#f5f0e8;color:#bbb;">🖼️</div>
+      <div class="gallery-item-info">
+        <div class="gi-name">
+          ${p.uploader ? `<span class="gi-group">${escHtml(p.uploader)}</span>` : ''}
+          ${p.quest_id !== null && p.quest_id !== undefined && p.quest_id !== '' ? `<span class="gi-quest-badge">${escHtml(quests[+p.quest_id]?.emoji || '')} Rallye</span>` : ''}
+        </div>
+        <div class="gi-meta">${p.description ? escHtml(p.description.substring(0,40)) : formatDate(p.uploaded_at)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterGallery() {
+  const text      = document.getElementById('gallery-search').value.toLowerCase();
+  const group     = document.getElementById('filter-group').value;
+  const questVal  = document.getElementById('filter-quest').value;
+
+  const filtered = allPhotos.filter(p => {
+    if (group && p.uploader !== group) return false;
+    if (questVal === 'general' && (p.quest_id !== null && p.quest_id !== undefined && p.quest_id !== '')) return false;
+    if (questVal === 'rally'   && (p.quest_id === null || p.quest_id === undefined || p.quest_id === '')) return false;
+    if (questVal !== '' && questVal !== 'general' && questVal !== 'rally' && String(p.quest_id) !== questVal) return false;
+    if (text && !(p.uploader || '').toLowerCase().includes(text) && !(p.description || '').toLowerCase().includes(text)) return false;
+    return true;
+  });
+  renderGallery(filtered);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// ===================== LIGHTBOX =====================
+function openLightbox(index) {
+  if (index < 0 || index >= allPhotos.length) return;
+  currentLightboxIndex = index;
+  updateLightbox();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function updateLightbox() {
+  const p = allPhotos[currentLightboxIndex];
+  if (!p) return;
+  const img = document.getElementById('lightbox-img');
+  img.style.display = '';
+  img.src = 'uploads/' + p.filename;
+  img.onerror = () => { img.style.display = 'none'; };
+  document.getElementById('lightbox-caption').textContent = p.description || '';
+  const questLabel = (p.quest_id !== null && p.quest_id !== undefined && p.quest_id !== '')
+    ? '  ·  🎯 ' + (quests[+p.quest_id]?.title || 'Rallye') : '';
+  document.getElementById('lightbox-meta').textContent = (p.uploader || '') + '  ·  ' + formatDate(p.uploaded_at) + questLabel;
+  document.getElementById('lightbox-delete').dataset.id = p.id;
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function closeLightboxOnBg(e) {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+}
+function lightboxNav(dir) {
+  currentLightboxIndex = (currentLightboxIndex + dir + allPhotos.length) % allPhotos.length;
+  updateLightbox();
+}
+async function deletePhoto() {
+  const id = document.getElementById('lightbox-delete').dataset.id;
+  if (!confirm('Dieses Foto wirklich löschen?')) return;
+  try {
+    const res = await fetch('delete_photo.php', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: 'id=' + encodeURIComponent(id) });
+    const data = await res.json();
+    if (data.success) {
+      allPhotos.splice(currentLightboxIndex, 1);
+      if (allPhotos.length === 0) { closeLightbox(); renderGallery([]); }
+      else { currentLightboxIndex = Math.min(currentLightboxIndex, allPhotos.length - 1); updateLightbox(); renderGallery(allPhotos); }
+    }
+  } catch { alert('Löschen fehlgeschlagen.'); }
+}
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+});
+
+// ===================== MAP =====================
+const mapLocations = [
+  { time: "09:30", icon: "⚓", title: "Westminster Pier",          desc: "Treffpunkt & Kopfzählen. Gruppen einteilen, Rallye-Aufgaben verteilen.", color: "#1a6b8a", lat: 51.5011, lng: -0.1204, rallyLinks: [3,8] },
+  { time: "10:00", icon: "👑", title: "Buckingham Palace",         desc: "Wachablösung. Rallye: Royal Guard Foto!",                                  color: "#8b5e3c", lat: 51.5014, lng: -0.1419, rallyLinks: [2]   },
+  { time: "10:45", icon: "🌳", title: "St. James's Park",          desc: "Pause & Snacks. Eichhörnchen-Rallye, Pelikan-Sichtung.",                   color: "#2d7a4f", lat: 51.5025, lng: -0.1340, rallyLinks: [0,10]},
+  { time: "11:30", icon: "🚌", title: "Bus 26 ab Parliament Sq.",  desc: "Einstieg. Fahrt über Whitehall → Trafalgar Square → Strand → Aldwych.",    color: "#c8102e", lat: 51.5007, lng: -0.1272, rallyLinks: []   },
+  { time: "12:00", icon: "🎭", title: "Covent Garden",             desc: "Freizeit! Straßenkünstler, Markthalle, Cafés.",                             color: "#c45c1a", lat: 51.5118, lng: -0.1240, rallyLinks: [7]   },
+  { time: "13:00", icon: "🏛️", title: "British Museum",            desc: "Rosetta Stone, Mumien, Elgin Marbles. Ca. 1–1,5h.",                        color: "#7a3d8b", lat: 51.5194, lng: -0.1270, rallyLinks: [11]  },
+  { time: "14:30", icon: "🦁", title: "Trafalgar Square",          desc: "Nelson's Column, vier Bronzelöwen. National Gallery nebenan.",              color: "#1a4d8b", lat: 51.5080, lng: -0.1281, rallyLinks: [1,5] },
+  { time: "15:15", icon: "🕐", title: "Big Ben & Westminster Br.", desc: "Foto-Stopp, Big Ben Mime Challenge, Panorama-Rallye.",                      color: "#8b3a3a", lat: 51.5009, lng: -0.1246, rallyLinks: [4,6] },
+  { time: "16:00", icon: "🎡", title: "Southbank / London Eye",    desc: "Entlang der Themse. Schöne Aussichten, letzter Rallye-Push.",               color: "#3a7a6b", lat: 51.5033, lng: -0.1195, rallyLinks: [9]   },
+];
+
+let leafletMap    = null;
+let gpsWatchId    = null;
+let gpsMarker     = null;
+let gpsActive     = false;
+
+function initMap() {
+  if (leafletMap) { leafletMap.invalidateSize(); return; }
+
+  leafletMap = L.map('map', { zoomControl: true }).setView([51.508, -0.128], 14);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(leafletMap);
+
+  // Route als gestrichelte Linie
+  const coords = mapLocations.map(l => [l.lat, l.lng]);
+  L.polyline(coords, { color: '#c8102e', weight: 3, opacity: 0.55, dashArray: '8,8' }).addTo(leafletMap);
+
+  // Marker für jeden Stopp
+  mapLocations.forEach((loc, i) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="map-marker" style="background:${loc.color}">
+               <div class="map-marker-inner">${i+1}</div>
+             </div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -34],
+    });
+
+    const chipsHtml = loc.rallyLinks.map(qi =>
+      `<span class="mp-chip" onclick="goToQuest(${qi})">${quests[qi].emoji} ${quests[qi].title}</span>`
+    ).join('');
+
+    const popup = `
+      <div>
+        <div class="mp-time">${loc.time} Uhr</div>
+        <div class="mp-title">${loc.icon} ${loc.title}</div>
+        <div class="mp-desc">${loc.desc}</div>
+        ${chipsHtml ? `<div class="mp-rally">${chipsHtml}</div>` : ''}
+      </div>`;
+
+    L.marker([loc.lat, loc.lng], { icon }).addTo(leafletMap).bindPopup(popup);
+  });
+}
+
+function toggleGps() {
+  if (!navigator.geolocation) {
+    alert('GPS wird von diesem Browser nicht unterstützt.');
+    return;
+  }
+  const btn = document.getElementById('gps-btn');
+  if (gpsActive) {
+    // GPS deaktivieren
+    if (gpsWatchId !== null) { navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
+    if (gpsMarker) { leafletMap.removeLayer(gpsMarker); gpsMarker = null; }
+    gpsActive = false;
+    btn.classList.remove('active');
+    btn.textContent = '📍';
+  } else {
+    // GPS aktivieren
+    btn.textContent = '⏳';
+    gpsWatchId = navigator.geolocation.watchPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const gpsIcon = L.divIcon({
+          className: '',
+          html: '<div class="gps-dot"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        });
+        if (!gpsMarker) {
+          gpsMarker = L.marker([lat, lng], { icon: gpsIcon, zIndexOffset: 1000 })
+            .addTo(leafletMap)
+            .bindPopup('📍 Dein Standort');
+          leafletMap.setView([lat, lng], 15);
+        } else {
+          gpsMarker.setLatLng([lat, lng]);
+        }
+        gpsActive = true;
+        btn.classList.add('active');
+        btn.textContent = '📍';
+      },
+      err => {
+        btn.textContent = '📍';
+        if (err.code === 1) alert('Bitte GPS-Zugriff im Browser erlauben.');
+        else alert('Standort konnte nicht ermittelt werden.');
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+  }
+}
+
+// ===================== RALLY UPLOAD MODAL =====================
+let rumFiles = [];
+let rumQuestId = null;
+
+document.getElementById('rum-file-gallery').addEventListener('change', e => { addRumFiles(Array.from(e.target.files)); e.target.value = ''; });
+document.getElementById('rum-file-camera').addEventListener('change',  e => { addRumFiles(Array.from(e.target.files)); e.target.value = ''; });
+
+function openRallyModal(questIndex) {
+  rumQuestId = questIndex;
+  rumFiles = [];
+  const q = quests[questIndex];
+  document.getElementById('rum-icon').textContent  = q.emoji;
+  document.getElementById('rum-title').textContent = q.title;
+  document.getElementById('rum-desc').value        = '';
+  document.getElementById('rum-msg').style.display = 'none';
+  document.getElementById('rum-progress').style.display = 'none';
+  renderRumPreview();
+  document.getElementById('rum-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeRallyModal(e, force) {
+  if (!force && e && e.target !== document.getElementById('rum-overlay')) return;
+  document.getElementById('rum-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function addRumFiles(newFiles) {
+  const allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+  const max = 10 * 1024 * 1024;
+  newFiles.forEach(f => {
+    if (!allowed.includes(f.type)) return;
+    if (f.size > max) { showRumMsg(f.name + ' zu groß (max. 10 MB)', 'error'); return; }
+    if (!rumFiles.find(x => x.name === f.name && x.size === f.size)) rumFiles.push(f);
+  });
+  renderRumPreview();
+}
+
+function removeRumFile(i) { rumFiles.splice(i, 1); renderRumPreview(); }
+
+function renderRumPreview() {
+  const el = document.getElementById('rum-preview');
+  el.innerHTML = rumFiles.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return `<div class="rum-preview-item">
+      <img class="rum-preview-thumb" src="${url}" />
+      <span class="rum-preview-name">${f.name}</span>
+      <span class="rum-preview-rm" onclick="removeRumFile(${i})">✕</span>
+    </div>`;
+  }).join('');
+}
+
+function showRumMsg(text, type) {
+  const el = document.getElementById('rum-msg');
+  el.textContent = text;
+  el.className = 'rum-msg ' + type;
+  el.style.display = 'block';
+}
+
+async function uploadRallyPhotos() {
+  const group = document.getElementById('rum-group').value;
+  const desc  = document.getElementById('rum-desc').value.trim();
+  if (!group) { showRumMsg('Bitte Gruppe wählen.', 'error'); return; }
+  if (rumFiles.length === 0) { showRumMsg('Bitte mindestens ein Foto auswählen.', 'error'); return; }
+
+  const btn       = document.getElementById('rum-submit');
+  const progEl    = document.getElementById('rum-progress');
+  const bar       = document.getElementById('rum-bar');
+  const progLabel = document.getElementById('rum-progress-label');
+
+  btn.disabled = true;
+  progEl.style.display = 'block';
+  document.getElementById('rum-msg').style.display = 'none';
+
+  let uploaded = 0;
+  const errors = [];
+  for (let i = 0; i < rumFiles.length; i++) {
+    const file = rumFiles[i];
+    progLabel.textContent = `Lade hoch: ${file.name} (${i+1}/${rumFiles.length})`;
+    bar.style.width = Math.round((i / rumFiles.length) * 100) + '%';
+
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('uploader', group);
+    fd.append('description', desc);
+    fd.append('quest_id', rumQuestId !== null ? String(rumQuestId) : '');
+    try {
+      const res  = await fetch('upload.php', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success) { uploaded++; }
+      else { errors.push(file.name + ': ' + (data.error || 'Fehler')); }
+    } catch { errors.push(file.name + ': Verbindungsfehler'); }
+  }
+
+  bar.style.width = '100%';
+  progLabel.textContent = 'Fertig!';
+  setTimeout(() => { progEl.style.display = 'none'; bar.style.width = '0%'; }, 1200);
+
+  if (errors.length > 0) {
+    showRumMsg(uploaded + ' Foto(s) hochgeladen. Fehler: ' + errors.join('; '), 'error');
+  } else {
+    showRumMsg(`✅ ${uploaded} Foto(s) hochgeladen!`, 'success');
+    // Quest als erledigt markieren
+    if (rumQuestId !== null) { checkedQuests[rumQuestId] = true; renderQuests(); }
+    rumFiles = [];
+    renderRumPreview();
+    setTimeout(() => {
+      document.getElementById('rum-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+    }, 1500);
+  }
+  btn.disabled = false;
+}
+
+// ===================== AUTH =====================
+function checkAuth() {
+  const role = sessionStorage.getItem('lkf_role');
+  if (role) {
+    applyRole(role);
+  }
+  // Overlay bleibt sichtbar bis Login erfolgreich
+}
+
+async function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!pw) return;
+
+  try {
+    const res = await fetch('login.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'password=' + encodeURIComponent(pw)
+    });
+    const data = await res.json();
+    if (data.success) {
+      sessionStorage.setItem('lkf_role', data.role);
+      applyRole(data.role);
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('login-pw').value = '';
+    } else {
+      errEl.style.display = 'block';
+      document.getElementById('login-pw').select();
+    }
+  } catch {
+    errEl.textContent = 'Verbindungsfehler — bitte Seite neu laden.';
+    errEl.style.display = 'block';
+  }
+}
+
+function applyRole(role) {
+  const badge = document.getElementById('role-badge');
+  const tag   = document.getElementById('role-tag');
+  badge.style.display = 'flex';
+  tag.textContent = role === 'admin' ? '👩‍🏫 Lehrkraft' : '🎒 Schüler:in';
+  document.getElementById('lightbox-delete').style.display = role === 'admin' ? '' : 'none';
+  // Einstellungen-Tab nur für Admin
+  document.getElementById('tab-btn-einstellungen').style.display = role === 'admin' ? '' : 'none';
+}
+
+function logout() {
+  sessionStorage.removeItem('lkf_role');
+  location.reload();
+}
+
+function togglePwVisibility() {
+  const input = document.getElementById('login-pw');
+  const eye   = document.getElementById('pw-eye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    eye.textContent = '👁';
+  }
+}
+
+// ===================== SETTINGS =====================
+function updateGroupDropdowns(count) {
+  // Upload-Tab und Rally-Modal: Gruppe 1 … Gruppe N
+  ['upload-group', 'rum-group'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Gruppe wählen...</option>' +
+      Array.from({length: count}, (_, i) =>
+        `<option${cur === `Gruppe ${i+1}` ? ' selected' : ''}>Gruppe ${i+1}</option>`
+      ).join('');
+  });
+  // Galerie-Filter: "Alle Gruppen" + Gruppe 1 … N
+  const fg = document.getElementById('filter-group');
+  if (fg) {
+    const cur = fg.value;
+    fg.innerHTML = '<option value="">Alle Gruppen</option>' +
+      Array.from({length: count}, (_, i) =>
+        `<option${cur === `Gruppe ${i+1}` ? ' selected' : ''}>Gruppe ${i+1}</option>`
+      ).join('');
+  }
+}
+
+async function loadSettings() {
+  try {
+    const res  = await fetch('get_settings.php');
+    const data = await res.json();
+    const count = Math.max(1, Math.min(20, parseInt(data.group_count) || 4));
+    document.getElementById('settings-group-count').value = count;
+    updateGroupDropdowns(count);
+  } catch {
+    updateGroupDropdowns(4); // Fallback
+  }
+}
+
+async function saveSettings() {
+  const count = parseInt(document.getElementById('settings-group-count').value);
+  const msg   = document.getElementById('settings-msg');
+  if (!count || count < 1 || count > 20) {
+    msg.textContent = 'Bitte eine Zahl zwischen 1 und 20 eingeben.';
+    msg.className = 'settings-msg err';
+    return;
+  }
+  try {
+    const res  = await fetch('save_settings.php', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'group_count=' + count
+    });
+    const data = await res.json();
+    if (data.success) {
+      updateGroupDropdowns(count);
+      msg.textContent = `✅ Gespeichert — ${count} Gruppe(n) werden jetzt angezeigt.`;
+      msg.className = 'settings-msg ok';
+    } else {
+      msg.textContent = '⚠️ ' + (data.error || 'Fehler beim Speichern.');
+      msg.className = 'settings-msg err';
+    }
+  } catch {
+    msg.textContent = '⚠️ Verbindungsfehler.';
+    msg.className = 'settings-msg err';
+  }
+  setTimeout(() => { msg.textContent = ''; }, 4000);
+}
+
+// ===================== INIT =====================
+checkAuth();
+loadSettings();
+renderSchedule(); renderStops(); renderQuests(); renderTipps();
+</script>
+</body>
+</html>
