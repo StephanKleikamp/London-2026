@@ -1,13 +1,10 @@
 -- ============================================================
 --  London Klassenfahrt — Datenbank-Setup
---  Einmalig ausführen, z.B. über phpMyAdmin bei Strato
---  oder per: mysql -u BENUTZER -p DATENBANKNAME < setup.sql
---
---  WICHTIG: Ersetze 'deine_datenbank' durch deinen echten
---  Datenbanknamen (steht im Strato-Kundenbereich).
+--  Ausführen per:
+--  mysql -u webuser -p webseite < setup.sql
 -- ============================================================
 
-USE `deine_datenbank`;
+USE `webseite`;
 
 CREATE TABLE IF NOT EXISTS photos (
     id          INT UNSIGNED     NOT NULL AUTO_INCREMENT,

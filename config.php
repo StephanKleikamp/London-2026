@@ -1,22 +1,12 @@
 <?php
 // ============================================================
-//  Datenbank-Konfiguration — Strato-Zugangsdaten eintragen
-//
-//  Wo findest du die Werte?
-//  Strato Kunden-Login → Meine Produkte → Hosting-Paket →
-//  "MySQL-Datenbanken verwalten"
-//
-//  DB_HOST: Steht dort als "Server" oder "Host", z.B.:
-//           db12345678.db.strato.de  (NICHT localhost!)
-//  DB_NAME: Der Datenbankname, z.B.: db12345678
-//  DB_USER: Meist identisch mit DB_NAME
-//  DB_PASS: Das Passwort das du beim Erstellen vergeben hast
+//  Datenbank-Konfiguration — WD My Cloud EX4100 (lokal)
 // ============================================================
 
-define('DB_HOST',     'database-5019970591.webspace-host.com');
-define('DB_NAME',     'dbs15413347');
-define('DB_USER',     'dbu4242856');
-define('DB_PASS',     'Klebe-25l0tt02026');
+define('DB_HOST',     'localhost');
+define('DB_NAME',     'webseite');
+define('DB_USER',     'webuser');
+define('DB_PASS',     'Klebe');
 
 // Upload-Verzeichnis relativ zu dieser Datei
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
